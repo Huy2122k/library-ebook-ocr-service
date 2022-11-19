@@ -39,5 +39,7 @@ class Chapter(db.Document):
     }
     def get_bucket_path(self):
         return f"book_{self.book_id}/{self.id}_{self.chapter_name}"
+    def get_pdf_path(self):
+        return f"book_{self.book_id}_chapter_{self.id}.pdf"
 
 Chapter.register_delete_rule(Page, 'chapter', db.CASCADE)

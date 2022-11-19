@@ -5,7 +5,7 @@ from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
 
-from cloud.minio_ultis import *
+from cloud.minio_utils import *
 from database.models import Chapter, Page
 from resources.chapter_errors import (ChapterAlreadyExistsError,
                                       ChapterNotExistsError,
