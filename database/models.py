@@ -1,21 +1,43 @@
+from enum import Enum
+
+from bson.objectid import ObjectId
+from flask_bcrypt import check_password_hash, generate_password_hash
+
 from .db import db
-from flask_bcrypt import generate_password_hash, check_password_hash
 
-class Movie(db.Document):
-    name = db.StringField(required=True, unique=True)
-    casts = db.ListField(db.StringField(), required=True)
-    genres = db.ListField(db.StringField(), required=True)
-    added_by = db.ReferenceField('User')
+BOOK_STATUS = {'PROCESSING', 'READY'}
+class Status(Enum):
+    NEW = "new"
+    PROCESSING = 'processing'
+    READY = 'ready'
 
-class User(db.Document):
-    email = db.EmailField(required=True, unique=True)
-    password = db.StringField(required=True, min_length=6)
-    movies = db.ListField(db.ReferenceField('Movie', reverse_delete_rule=db.PULL))
+class Page(db.Document):
+    image_url = db.URLField(required=True, unique=True)
+    chapter = db.ReferenceField("Chapter", required=True)
+    page_number = db.IntField(required=True)
+    meta = {
+        'indexes': [
+            {
+                'fields': ['chapter', 'page_number'],
+                'unique': True  
+            }
+        ]
+    }
+class Chapter(db.Document):
+    book_id = db.StringField(required=True, unique=True)
+    chapter_name = db.StringField(required=True)
+    pdf_url = db.URLField(required=False, unique=True)
+    pages = db.ListField(db.ReferenceField('Page', reverse_delete_rule=db.PULL), default=[])
+    status = db.EnumField(Status, default=Status.NEW)
+    meta = {
+        'indexes': [
+            {
+                'fields': ['book_id'],
+                'unique': True  
+            }
+        ]
+    }
+    def get_bucket_path(self):
+        return f"book_{self.book_id}/{self.id}_{self.chapter_name}"
 
-    def hash_password(self):
-        self.password = generate_password_hash(self.password).decode('utf8')
-
-    def check_password(self, password):
-        return check_password_hash(self.password, password)
-
-User.register_delete_rule(Movie, 'added_by', db.CASCADE)
+Chapter.register_delete_rule(Page, 'chapter', db.CASCADE)
