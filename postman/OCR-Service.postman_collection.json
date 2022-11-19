@@ -1,0 +1,231 @@
+{
+	"info": {
+		"_postman_id": "b141e5d5-5717-4599-b263-32cc21e673c6",
+		"name": "OCR-Service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "15044798"
+	},
+	"item": [
+		{
+			"name": "http://127.0.0.1:5000/api/v1/comment",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"book_id\": \"0009f70b-529e-40c9-a53e-4ac0e85c8d65\",\r\n    \"chapter_name\": \"Chapter 1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3500/api/chapters",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3500",
+					"path": [
+						"api",
+						"chapters"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://127.0.0.1:5000/api/v1/comment Copy",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"chapter_id\":\"6378b1fbc462477c40e1948f\",\r\n    \"page_number\": 2\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3500/api/pages",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3500",
+					"path": [
+						"api",
+						"pages"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://127.0.0.1:5000/api/v1/comment Copy 2",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"chapter_id\":\"6377c01b106becb67edd715e\",\r\n    \"image_url\": \"https://www.google.com/845s.jpg\",\r\n    \"page_number\": 33\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3500/api/pages",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3500",
+					"path": [
+						"api",
+						"pages"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://127.0.0.1:5000/api/v1/comment Copy 2",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"image_url\": \"https://www.google.com/845sf.jpg\",\r\n    \"page_number\": 33\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3500/api/pages/6377c274e9f0e5c49521f448",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3500",
+					"path": [
+						"api",
+						"pages",
+						"6377c274e9f0e5c49521f448"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "OCR",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"type\":\"single_page\",\r\n    \"id\": \"6378b79aeefed11650117eb6\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:3500/api/ocr",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "3500",
+					"path": [
+						"api",
+						"ocr"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "https://play.min.io:9000/d0f2eb0c89c40dbdd483d02449642eb2/book_0009f70b-529e-40c9-a53e-4ac0e85c8d65/6378b1fbc462477c40e1948f_Chapter%201/2.jpg?response-content-type=application%2Fjson&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Q3AM3UQ867SPQQA43P2Fg",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "file",
+					"file": {
+						"src": "/C:/Users/Vhc/Pictures/Datacrawl2.png"
+					}
+				},
+				"url": {
+					"raw": "https://play.min.io:9000/d0f2eb0c89c40dbdd483d02449642eb2/book_0009f70b-529e-40c9-a53e-4ac0e85c8d65/6378b1fbc462477c40e1948f_Chapter%201/2.jpg?response-content-type=application%2Fjson&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=Q3AM3UQ867SPQQA43P2FgF%2F20221119%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20221119T110146Z&X-Amz-Expires=7200&X-Amz-SignedHeaders=host&X-Amz-Signature=ac6f48f9b735f35e7c85263e3dbafd2c963b72eff9dafcf3d03dfc33d632fa32",
+					"protocol": "https",
+					"host": [
+						"play",
+						"min",
+						"io"
+					],
+					"port": "9000",
+					"path": [
+						"d0f2eb0c89c40dbdd483d02449642eb2",
+						"book_0009f70b-529e-40c9-a53e-4ac0e85c8d65",
+						"6378b1fbc462477c40e1948f_Chapter%201",
+						"2.jpg"
+					],
+					"query": [
+						{
+							"key": "response-content-type",
+							"value": "application%2Fjson"
+						},
+						{
+							"key": "X-Amz-Algorithm",
+							"value": "AWS4-HMAC-SHA256"
+						},
+						{
+							"key": "X-Amz-Credential",
+							"value": "Q3AM3UQ867SPQQA43P2FgF%2F20221119%2Fus-east-1%2Fs3%2Faws4_request"
+						},
+						{
+							"key": "X-Amz-Date",
+							"value": "20221119T110146Z"
+						},
+						{
+							"key": "X-Amz-Expires",
+							"value": "7200"
+						},
+						{
+							"key": "X-Amz-SignedHeaders",
+							"value": "host"
+						},
+						{
+							"key": "X-Amz-Signature",
+							"value": "ac6f48f9b735f35e7c85263e3dbafd2c963b72eff9dafcf3d03dfc33d632fa32"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
