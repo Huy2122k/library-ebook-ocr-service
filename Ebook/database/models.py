@@ -26,7 +26,7 @@ class Page(db.Document):
 class Chapter(db.Document):
     book_id = db.StringField(required=True, unique=True)
     chapter_name = db.StringField(required=True)
-    pdf_url = db.URLField(required=False, unique=True)
+    pdf_url = db.URLField(required=False)
     pages = db.ListField(db.ReferenceField('Page', reverse_delete_rule=db.PULL), default=[])
     status = db.EnumField(Status, default=Status.NEW)
     meta = {
@@ -34,7 +34,11 @@ class Chapter(db.Document):
             {
                 'fields': ['book_id'],
                 'unique': True  
-            }
+            },
+            {
+                'fields': ['book_id', 'pdf_url'],
+                'unique': True  
+            },
         ]
     }
     def get_bucket_path(self):
