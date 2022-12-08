@@ -68,6 +68,11 @@ def merge_bounding_box(wordList):
     
     return lineStartPoints, lineEndPoints
 
+# Chuyển thông tin bounding box từ top left/bottom right
+# sang x_top_left/y_top_left/width/height
+def convert_bb_type(startPoint, endPoint):
+    return {'x': startPoint[0], 'y': startPoint[1], 'width': endPoint[0]-startPoint[0], 'height': endPoint[1]-startPoint[1]}
+
 def bounding_box_preprocess(pdf_object_key):
     try:
         response = minio_client.get_object(config["BASE_BUCKET"], pdf_object_key)
@@ -81,7 +86,7 @@ def bounding_box_preprocess(pdf_object_key):
             text = get_text(wordList)
             boundingBox = []
             for (startPoint, endPoint) in zip(startPoints, endPoints):
-                boundingBox.append([startPoint, endPoint])
+                boundingBox.append(convert_bb_type(startPoint, endPoint))
 
             info = {'index': sentenceIdx, 'boundingBox': boundingBox, 'text': text}
             metadata.append(info)
