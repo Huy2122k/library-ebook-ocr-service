@@ -4,8 +4,11 @@ flask-restful
 flask-bcrypt
 flask-jwt-extended
 flask-mail
+flask_cors
 minio
 python-dotenv
 pytesseract
 Pillow
 PyMuPDF
+celery[mongodb]
+redis
