@@ -1,12 +1,11 @@
+from cloud.minio_utils import *
+from database.models import Chapter, Page
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
 from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
-
-from cloud.minio_utils import *
-from database.models import Chapter, Page
 from resources.chapter_errors import (ChapterAlreadyExistsError,
                                       ChapterNotExistsError,
                                       DeletingChapterError,
@@ -29,8 +28,7 @@ class ChaptersApi(Resource):
             body = request.get_json()
             chapter = Chapter(**body)
             chapter.save()
-            id = chapter.id
-            return {'id': str(id)}, 200
+            return Response(chapter.to_json(), mimetype="application/json", status=200)
         except (FieldDoesNotExist, ValidationError):
             raise SchemaValidationError
         except NotUniqueError:
@@ -40,14 +38,20 @@ class ChaptersApi(Resource):
 
 
 class ChapterApi(Resource):
-    @jwt_required
+    def get(self, chapter_id):
+        try:
+            Chapters = Chapter.objects.get(id=chapter_id).to_json()
+            return Response(Chapters, mimetype="application/json", status=200)
+        except DoesNotExist:
+            raise ChapterNotExistsError
+        except Exception:
+            raise InternalServerError
+    # @jwt_required
     def put(self, chapter_id):
         try:
-            user_id = get_jwt_identity()
-            Chapter = Chapter.objects.get(id=chapter_id, added_by=user_id)
             body = request.get_json()
             Chapter.objects.get(id=chapter_id).update(**body)
-            return '', 200
+            return 'update successful', 200
         except InvalidQueryError:
             raise SchemaValidationError
         except DoesNotExist:
@@ -55,11 +59,11 @@ class ChapterApi(Resource):
         except Exception:
             raise InternalServerError       
     
-    @jwt_required
-    def delete(self, id):
+    # @jwt_required
+    def delete(self, chapter_id):
         try:
             user_id = get_jwt_identity()
-            Chapter = Chapter.objects.get(id=id, added_by=user_id)
+            Chapter = Chapter.objects.get(id=chapter_id)
             Chapter.delete()
             return '', 200
         except DoesNotExist:
@@ -67,11 +71,4 @@ class ChapterApi(Resource):
         except Exception:
             raise InternalServerError
 
-    def get(self, id):
-        try:
-            Chapters = Chapter.objects.get(id=id).to_json()
-            return Response(Chapters, mimetype="application/json", status=200)
-        except DoesNotExist:
-            raise ChapterNotExistsError
-        except Exception:
-            raise InternalServerError
+

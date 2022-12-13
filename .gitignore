@@ -3,3 +3,5 @@ __pycache__
 */.env.cloud
 ocr/output_temp
 minio
+Ebook/cloud/.env.cloud
+*/*.log

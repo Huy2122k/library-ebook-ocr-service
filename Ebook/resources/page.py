@@ -1,14 +1,13 @@
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
+from cloud.minio_utils import *
+from database.models import Chapter, Page
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
 from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
-
-from cloud.minio_utils import *
-from database.models import Chapter, Page
 from resources.base_errors import InvalidIdReq
 from resources.page_errors import (DeletingPageError, InternalServerError,
                                    PageAlreadyExistsError, PageNotExistsError,
@@ -35,15 +34,16 @@ class PagesApi(Resource):
             chapter_id = body.pop("chapter_id")
             chapter = Chapter.objects.get(id=chapter_id)
             page =  Page(**body, chapter=chapter)
-            path = chapter.get_bucket_path()
-            url = get_image_post_presigned_url(f"{path}/{page.page_number}.jpg")
-            if url is not None:
-                page.image_url = url
-                page.save()
-                chapter.update(push__pages=page)
-                chapter.save()
-            else:
-                return {'message': "error! cannot upload to cloud"}, 503
+            # path = chapter.get_bucket_path()
+            # url = get_image_post_presigned_url(f"{path}/{page.page_number}.jpg")
+            # if url is not None:
+            #     page.image_url = url
+            #     page.save()
+            #     chapter.update(push__pages=page)
+            #     chapter.save()
+            # else:
+            #     return {'message': "error! cannot upload to cloud"}, 503
+            page.save()
             id = page.id
             return {'id': str(id), "url": page.image_url}, 200
         except (FieldDoesNotExist, ValidationError):
