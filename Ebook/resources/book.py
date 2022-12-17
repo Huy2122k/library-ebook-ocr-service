@@ -23,18 +23,20 @@ class BooksApi(Resource):
         print(body)
         try:
             # user_id = get_jwt_identity()
-            if body["type_ebook"] == "pdf":
+            if body["type_ebook"] == EbookType.PDF:
                 book = Book(book_id = body['book_id'], type_ebook = EbookType.PDF) 
                 book.save()
                 book.create_chapters_and_pages(body["chapters_info"])
-                print("heree")
                 for chapter in Chapter.objects(book_id=book.book_id):
                     for page in chapter.pages:
                         # pdf_app.split_page_pdf.apply_async((page.id, page.page_number, page.get_pdf_key(), page.get_image_key(),book.get_pdf_key()), link_error=[pdf_app.page_error.s("pdf_status", page.id), pdf_app.page_error.s("image_status", page.id), log_error.s()])
-                        (split_page_pdf.si(str(page.id), page.page_number, page.get_pdf_key(), page.get_image_key(), book.get_pdf_key()) | bounding_box_preprocess.si(str(page.id), page.get_image_key())).apply_async()
-                id = book.id
-                return {'id': str(id)}, 200
+                        (split_page_pdf.si(str(page.id), page.page_number, page.get_pdf_key(), page.get_image_key(), book.get_pdf_key()) | bounding_box_preprocess.si(str(page.id), page.get_pdf_key())).apply_async()
+                return {'id': str(book.id)}, 200
                 # return "Cannot create split jobs", 500
+            elif body["type_ebook"] == EbookType.OCR:
+                book = Book(book_id = body['book_id'], type_ebook = EbookType.OCR) 
+                book.save()
+                return {'id': str(book.id)}, 200
             else:
                 return {'error': "bad type"}, 400
         except Exception as e:

@@ -1,5 +1,5 @@
 from cloud.minio_utils import *
-from database.models import Chapter, Page
+from database.models import Book, Chapter, Page
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
@@ -16,11 +16,13 @@ from resources.chapter_errors import (ChapterAlreadyExistsError,
 
 class ChaptersApi(Resource):
     def get(self):
-        status_find = request.args.get('status')
-        query = Chapter.objects(status=status_find)
-        Chapters = query.to_json()
-        return Response(Chapters, mimetype="application/json", status=200)
-
+        params = request.args.to_dict()
+        print(params)
+        if params:
+            query = Chapter.objects(**params)
+            Chapters = query.to_json()
+            return Response(Chapters, mimetype="application/json", status=200)
+        return [], 200
     # @jwt_required
     def post(self):
         try:

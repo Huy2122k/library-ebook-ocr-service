@@ -5,6 +5,7 @@ import sys
 import traceback
 
 import fitz
+import pytesseract
 import redis
 import requests
 from celery import Celery
@@ -12,6 +13,10 @@ from celery.utils.log import get_task_logger
 from cloud.minio_utils import config, minio_client
 from database.models import *
 from jobs.pdf_utils import *
+from PIL import Image
+
+# If you don't have tesseract executable in your PATH, include the following:
+pytesseract.pytesseract.tesseract_cmd = r'D:/Tesseract/tesseract'
 
 cache = redis.Redis(host='localhost', port=6379, db=0,  password ="eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81")
 
@@ -68,13 +73,14 @@ def split_page_pdf(page_id, page_number,page_pdf_object_key, page_img_object_key
                                 content_type = 'image/png')
         y = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"image_status": Status.READY})
         logger.info(f"page {page_id} image create", x.status_code)
-        return [x.status_code, y.status_code]
+        return {"page_id": page_id, "image_status": Status.READY, "pdf_status": Status.READY}
     except Exception as e:
         with open('errors.log', 'a') as fh:
             print('--\n\n{0}'.format(traceback), file=fh)
             traceback.print_exc(file=fh)
         requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"pdf_status": Status.ERROR})
         requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"image_status": Status.ERROR})
+        return {"page_id": page_id, "image_status": Status.ERROR, "pdf_status": Status.ERROR}
 # @pdf_app.task()
 # def create_page_image(page_data, page_img_object_key, page_id):
 #     pix = page_data.get_pixmap()
@@ -118,9 +124,38 @@ def bounding_box_preprocess(page_id, pdf_object_key):
             boundingBox = []
             for (startPoint, endPoint) in zip(startPoints, endPoints):
                 boundingBox.append(convert_bb_type(startPoint, endPoint))
-            info = {'index': sentenceIdx, 'boundingBox': boundingBox, 'text': text}
+            info = {'index': sentenceIdx, 'bounding_box': boundingBox, 'text': text}
             metadata.append(info)
             x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"sentences": metadata})
+            return x.json()
         return x.status
     except Exception as e:
+        with open('errors.log', 'a') as fh:
+            print('--\n\n{0}'.format(traceback), file=fh)
+            traceback.print_exc(file=fh)
         x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"ocr_status": Status.ERROR})
+        return {"page_id": page_id, "ocr_status": Status.ERROR}
+
+@pdf_app.task()
+def create_ocr_page(img_object_key, pdf_object_key):
+    try:
+        response = minio_client.get_object(config["BASE_BUCKET"], img_object_key)
+        im = Image.open(response)
+        pdf = pytesseract.image_to_pdf_or_hocr(im, extension='pdf')
+        raw_pdf = io.BytesIO(pdf)
+        raw_pdf_size = raw_pdf.getbuffer().nbytes
+        minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
+                                object_name = pdf_object_key, 
+                                data = raw_pdf, 
+                                length= raw_pdf_size,
+                                content_type = 'application/pdf')
+    except Exception as e:
+        on_error(e) #
+        return None
+
+def on_error(e):
+    with open('errors.log', 'a') as fh:
+        print('--\n\n{0}'.format(traceback), file=fh)
+        traceback.print_exc(file=fh)
+    print(e)
+    

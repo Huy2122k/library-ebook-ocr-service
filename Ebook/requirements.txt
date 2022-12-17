@@ -12,3 +12,4 @@ Pillow
 PyMuPDF
 celery[mongodb]
 redis
+flower

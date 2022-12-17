@@ -5,3 +5,4 @@
 docker compose -f jobs/queue.yml up -d
 
 celery -A pdf_task.pdf_app worker --pool=solo --loglevel=info
+celery -A pdf_task.pdf_app flower --address=127.0.0.6 --port=5566 --broker=amqp://admin:mypass@localhost:5672

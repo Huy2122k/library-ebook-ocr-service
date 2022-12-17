@@ -12,10 +12,24 @@ class Status(str, Enum):
     READY = "ready"
     ERROR = "error"
 
-class EbookType(Enum):
+class EbookType(str, Enum):
     PDF="pdf",
     OCR="ocr",
     OTHER="other"
+
+class Sentence(db.EmbeddedDocument):
+    page = db.ReferenceField('Page', required=True)
+    index = db.IntField(required=True)
+    text = db.StringField()
+    bounding_box = db.ListField(default=[])
+    audio_timestamp = db.FloatField(default=None)
+    meta = {
+        'indexes': [
+            {
+                'fields': "text", 
+            }
+        ]
+    }
 class Page(db.Document):
     chapter = db.ReferenceField("Chapter", required=True)
     page_number = db.IntField(required=True)
@@ -23,6 +37,8 @@ class Page(db.Document):
     image_status = db.EnumField(Status, default=Status.NEW, validators=None)
     ocr_status = db.EnumField(Status, default=Status.NEW, validators=None)
     audio_status = db.EnumField(Status, default=Status.NEW, validators=None)
+    audio_length = db.FloatField()
+    sentences = db.ListField(db.EmbeddedDocumentField('Sentence'), default=[])
     meta = {
         'indexes': [
             {

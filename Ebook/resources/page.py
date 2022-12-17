@@ -1,7 +1,7 @@
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from cloud.minio_utils import *
-from database.models import Chapter, Page
+from database.models import Chapter, Page, Sentence
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
@@ -60,6 +60,11 @@ class PageApi(Resource):
         try:
             # user_id = get_jwt_identity()
             body = request.get_json()
+            if "sentences" in body:
+                page =  Page.objects.get(id=page_id)
+                page.update(sentences= [Sentence(**se, page = page) for se in body["sentences"]])
+                page.save()
+                return {"page_id": page_id,"msg":"create sentences successful"}, 200
             Page.objects.get(id=page_id).update(**body)
             return 'successful', 200
         except InvalidQueryError:
