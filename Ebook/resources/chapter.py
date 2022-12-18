@@ -17,11 +17,10 @@ from resources.chapter_errors import (ChapterAlreadyExistsError,
 class ChaptersApi(Resource):
     def get(self):
         params = request.args.to_dict()
-        print(params)
         if params:
-            query = Chapter.objects(**params)
-            Chapters = query.to_json()
-            return Response(Chapters, mimetype="application/json", status=200)
+            query = Chapter.objects(**params).get_chapters_detail()
+            # chapters = query.to_json()
+            return query, 200
         return [], 200
     # @jwt_required
     def post(self):

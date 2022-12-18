@@ -66,7 +66,6 @@ def get_image_post_presigned_url(object_key, expires_hours = 2 ):
 
 def generate_presigned_url(object_key, method, response_type ="application/json", expires_hours = 2 ):
     try:
-        print(response_type)
         if method not in ("GET", "PUT"):
             return None
         url = minio_client.get_presigned_url(

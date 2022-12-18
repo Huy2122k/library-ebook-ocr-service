@@ -37,16 +37,20 @@ def split_page_pdf(page_id, page_number,page_pdf_object_key, page_img_object_key
     try:
         # caching is error now
         # book_cached = cache.get(book_pdf_object_key)
+        cache_path = f"cache/{book_pdf_object_key}"
+        if not os.path.exists(cache_path):
+            response = minio_client.get_object(config["BASE_BUCKET"], book_pdf_object_key)
+            bookDoc = fitz.open("pdf", response.data)
+            print("CACHED!")
+            bookDoc.save(cache_path)
+        else:
+            bookDoc = fitz.open(cache_path)
         # if book_cached is None:
-        #     response = minio_client.get_object(config["BASE_BUCKET"], book_pdf_object_key)
         #     bookDoc = fitz.open("pdf", response.data)
         #     pickled_object = pickle.dumps(bookDoc)
-        #     cache.set(book_pdf_object_key, pickled_object)
-        #     print("CACHED!")
+        #     cache.set(book_pdf_object_key, pickled_obje
         # else:
         #     bookDoc = pickle.loads(book_cached)
-        response = minio_client.get_object(config["BASE_BUCKET"], book_pdf_object_key)
-        bookDoc = fitz.open("pdf", response.data)
         page_data = bookDoc[page_number]
 
         page_data_pdf = fitz.open() # an empty pdf file is opened
@@ -126,18 +130,17 @@ def bounding_box_preprocess(page_id, pdf_object_key):
                 boundingBox.append(convert_bb_type(startPoint, endPoint))
             info = {'index': sentenceIdx, 'bounding_box': boundingBox, 'text': text}
             metadata.append(info)
-            x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"sentences": metadata})
-            return x.json()
-        return x.status
+        x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"sentences": metadata, "bounding_box_status": Status.READY})
+        return x.json()
     except Exception as e:
         with open('errors.log', 'a') as fh:
             print('--\n\n{0}'.format(traceback), file=fh)
             traceback.print_exc(file=fh)
-        x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"ocr_status": Status.ERROR})
-        return {"page_id": page_id, "ocr_status": Status.ERROR}
+        x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"bounding_box_status": Status.ERROR})
+        return {"page_id": page_id, "bounding_box_status": Status.ERROR}
 
 @pdf_app.task()
-def create_ocr_page(img_object_key, pdf_object_key):
+def create_ocr_page(page_id, img_object_key, pdf_object_key):
     try:
         response = minio_client.get_object(config["BASE_BUCKET"], img_object_key)
         im = Image.open(response)
@@ -149,9 +152,12 @@ def create_ocr_page(img_object_key, pdf_object_key):
                                 data = raw_pdf, 
                                 length= raw_pdf_size,
                                 content_type = 'application/pdf')
+        x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"pdf_status": Status.READY})
+        return x.json()
     except Exception as e:
         on_error(e) #
-        return None
+        x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"pdf_status": Status.ERROR})
+        return {"page_id": page_id, "pdf_status": Status.ERROR}
 
 def on_error(e):
     with open('errors.log', 'a') as fh:

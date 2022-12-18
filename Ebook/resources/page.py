@@ -32,20 +32,17 @@ class PagesApi(Resource):
             # user_id = get_jwt_identity()
             body = request.get_json()
             chapter_id = body.pop("chapter_id")
-            chapter = Chapter.objects.get(id=chapter_id)
-            page =  Page(**body, chapter=chapter)
-            # path = chapter.get_bucket_path()
-            # url = get_image_post_presigned_url(f"{path}/{page.page_number}.jpg")
-            # if url is not None:
-            #     page.image_url = url
-            #     page.save()
-            #     chapter.update(push__pages=page)
-            #     chapter.save()
-            # else:
-            #     return {'message': "error! cannot upload to cloud"}, 503
-            page.save()
-            id = page.id
-            return {'id': str(id), "url": page.image_url}, 200
+            page_type = body.pop("page_type")
+            if page_type == "page_ocr":
+                chapter = Chapter.objects.get(id=chapter_id)
+                page =  Page(**body, chapter=chapter)
+                page.save()
+                chapter.update(push__pages=page)
+                chapter.save()
+                url = generate_presigned_url(object_key=page.get_image_key(), method="PUT")
+                return {'id': str(page.id), "presigned_url": url}, 200
+            else:
+                return {'msg':"unsupported type page"}, 400
         except (FieldDoesNotExist, ValidationError):
             raise SchemaValidationError
         except NotUniqueError:
@@ -62,7 +59,10 @@ class PageApi(Resource):
             body = request.get_json()
             if "sentences" in body:
                 page =  Page.objects.get(id=page_id)
-                page.update(sentences= [Sentence(**se, page = page) for se in body["sentences"]])
+                page.update(
+                    sentences= [Sentence(**se, page = page) for se in body["sentences"]], 
+                    bounding_box_status=body["bounding_box_status"]
+                )
                 page.save()
                 return {"page_id": page_id,"msg":"create sentences successful"}, 200
             Page.objects.get(id=page_id).update(**body)
@@ -78,7 +78,7 @@ class PageApi(Resource):
     def delete(self, page_id):
         try:
             # user_id = get_jwt_identity()
-            page = Page.objects.get(id=id)
+            page = Page.objects.get(id=page_id)
             page.delete()
             return 'delete successful', 200
         except DoesNotExist:

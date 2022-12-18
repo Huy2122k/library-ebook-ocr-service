@@ -1,7 +1,10 @@
+import json
 from enum import Enum
 
 from bson.objectid import ObjectId
+from cloud.minio_utils import *
 from flask_bcrypt import check_password_hash, generate_password_hash
+from mongoengine.queryset import QuerySet
 
 from .db import db
 
@@ -35,7 +38,7 @@ class Page(db.Document):
     page_number = db.IntField(required=True)
     pdf_status = db.EnumField(Status, default=Status.NEW, validators=None )
     image_status = db.EnumField(Status, default=Status.NEW, validators=None)
-    ocr_status = db.EnumField(Status, default=Status.NEW, validators=None)
+    bounding_box_status = db.EnumField(Status, default=Status.NEW, validators=None)
     audio_status = db.EnumField(Status, default=Status.NEW, validators=None)
     audio_length = db.FloatField()
     sentences = db.ListField(db.EmbeddedDocumentField('Sentence'), default=[])
@@ -53,6 +56,23 @@ class Page(db.Document):
         return f"{self.chapter.book_id}/chapter_{self.chapter.chapter_number}/page_pdf/page_{self.page_number}_{self.id}.pdf"
     def get_audio_key(self):
         return f"{self.chapter.book_id}/chapter_{self.chapter.chapter_number}/page_audio/page_{self.page_number}_{self.id}.mp3"
+
+class AwesomerQuerySet(QuerySet):
+    def get_chapters_detail(self):
+        chapters = self.all()
+        response = []
+        for chapter in chapters:
+            chapter_dict = json.loads(chapter.to_json())
+            chapter_dict["pages"] = []
+            for page in chapter.pages:
+                page_dict = json.loads(page.to_json())
+                page_dict["presigned_img"] = generate_presigned_url(page.get_image_key(),"GET", "image/*") 
+                page_dict["presigned_pdf"] =  generate_presigned_url(page.get_pdf_key(),"GET", "application/pdf") 
+                page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET") 
+                chapter_dict["pages"].append(page_dict)
+            chapter_dict["status"] = chapter.status
+            response.append(chapter_dict)
+        return response
 class Chapter(db.Document):
     book_id = db.StringField(required=True)
     chapter_name = db.StringField(required=True)
@@ -71,7 +91,8 @@ class Chapter(db.Document):
                 'fields': ['book_id'],
                 'unique': False  
             },
-        ]
+        ],
+        'queryset_class': AwesomerQuerySet
     }
     def get_pdf_key(self):
         return f"{self.book_id}/chapter_{self.chapter_number}/{self.id}.pdf" 
@@ -92,7 +113,7 @@ class Chapter(db.Document):
         return {
             "pdf_status" : self.check_status("pdf_status"),
             "image_status" : self.check_status("image_status"),
-            "ocr_status"  : self.check_status("ocr_status"),
+            "bounding_box_status"  : self.check_status("bounding_box_status"),
             "audio_status" : self.check_status("audio_status")
         }
         
@@ -114,7 +135,7 @@ class Book(db.Document):
             chapter.save()
             #create pages
             for number in range(int(chapter_info["chapter_from"]), int(chapter_info["chapter_to"] + 1)):
-                page = Page(chapter=chapter, page_number = number, ocr_status = Status.READY)
+                page = Page(chapter=chapter, page_number = number)
                 page.save()
                 chapter.update(push__pages=page)
             chapter.save()

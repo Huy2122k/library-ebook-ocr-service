@@ -31,6 +31,8 @@ class BooksApi(Resource):
                     for page in chapter.pages:
                         # pdf_app.split_page_pdf.apply_async((page.id, page.page_number, page.get_pdf_key(), page.get_image_key(),book.get_pdf_key()), link_error=[pdf_app.page_error.s("pdf_status", page.id), pdf_app.page_error.s("image_status", page.id), log_error.s()])
                         (split_page_pdf.si(str(page.id), page.page_number, page.get_pdf_key(), page.get_image_key(), book.get_pdf_key()) | bounding_box_preprocess.si(str(page.id), page.get_pdf_key())).apply_async()
+                        page.update(image_status = Status.PROCESSING,pdf_status=Status.PROCESSING,bounding_box_preprocess=Status.PROCESSING )
+                        page.save()
                 return {'id': str(book.id)}, 200
                 # return "Cannot create split jobs", 500
             elif body["type_ebook"] == EbookType.OCR:
