@@ -32,9 +32,10 @@ config your .env and cloud/env.cloud
 
 service
 
+- in root folder run this command to startup minio + redis + rabbitmq
+
 ```
-docker compose -f jobs/queue.yml up -d
-docker compose -f cloud/docker-compose.yml up -d
+docker compose up -d
 ```
 
 workers

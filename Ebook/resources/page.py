@@ -60,6 +60,7 @@ class PageApi(Resource):
             # user_id = get_jwt_identity()
             body = request.get_json()
             if "sentences" in body:
+                print(body["sentences"])
                 page =  Page.objects.get(id=page_id)
                 page.update(
                     sentences= [Sentence(**se, page = page) for se in body["sentences"]], 

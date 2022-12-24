@@ -1,3 +1,4 @@
+import copy
 import io
 import os
 import pickle
@@ -26,7 +27,7 @@ AudioSegment.ffprobe ="C:\\ffmpeg\\ffmpeg\\bin\\ffprobe.exe"
 # If you don't have tesseract executable in your PATH, include the following:
 pytesseract.pytesseract.tesseract_cmd = r'D:/Tesseract/tesseract'
 
-cache = redis.Redis(host='localhost', port=6379, db=0,  password ="eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81")
+# cache = redis.Redis(host='localhost', port=6379, db=0,  password ="eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81")
 
 logger = get_task_logger(__name__)
 
@@ -171,7 +172,7 @@ def on_error(e):
     
 
 
-def convert_text_to_pydub_audio_segment(text, language="en"):
+def convert_text_to_pydub_audio_segment(text, language="vi"):
     gtts_object = gTTS(text = text, 
                        lang = language,
                        slow = False)
@@ -190,7 +191,7 @@ def merge_audio_segments(audio_segment_list):
 def text_to_speech(page_id, page_audio_object_key):
     try:
         get_response = requests.get(f"{APP_HOST}/api/page/{page_id}")
-        sentence_list = get_response.json()['sentences']
+        sentence_list = copy.deepcopy(get_response.json()['sentences'])
         audio_segment_list = []
         for sentence in sentence_list:
             text = sentence['text']
