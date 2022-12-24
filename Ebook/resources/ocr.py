@@ -24,9 +24,11 @@ class OcrApi(Resource):
                 pages = Page.objects(chapter=ObjectId(str(body["chapter_id"])))
                 for page in pages:
                     if page.bounding_box_status == Status.READY:
+                        if page.audio_status != Status.READY:
+                            text_to_speech.si(str(page.id), page.get_audio_key()).apply_async()
                         continue
-                    (create_ocr_page.si(str(page.id), page.get_image_key(), page.get_pdf_key()) | bounding_box_preprocess.si(str(page.id), page.get_pdf_key())).apply_async()
-                    page.update(pdf_status=Status.PROCESSING,bounding_box_status=Status.PROCESSING )
+                    (create_ocr_page.si(str(page.id), page.get_image_key(), page.get_pdf_key()) | bounding_box_preprocess.si(str(page.id), page.get_pdf_key()) | text_to_speech.si(str(page.id), page.get_audio_key())).apply_async()
+                    page.update(pdf_status=Status.PROCESSING,bounding_box_status=Status.PROCESSING, audio_status = Status.PROCESSING )
                     page.save()
                 return f'successful OCR', 200
             # elif body["type"] == "single_page":

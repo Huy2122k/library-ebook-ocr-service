@@ -1,3 +1,5 @@
+import json
+
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from cloud.minio_utils import *
@@ -88,9 +90,16 @@ class PageApi(Resource):
 
     def get(self, page_id):
         try:
-            pages = Page.objects.get(id=page_id).to_json()
-            return Response(pages, mimetype="application/json", status=200)
+            page = Page.objects.get(id=page_id)
+            page_with_presign = self.append_image_presign_url(page)
+            return page_with_presign, 200
         except DoesNotExist:
             raise PageNotExistsError
         except Exception:
             raise InternalServerError
+    def append_image_presign_url(self,page):
+        page_dict = json.loads(page.to_json())
+        page_dict["presigned_img"] = generate_presigned_url(page.get_image_key(),"GET", "image/*") 
+        page_dict["presigned_pdf"] =  generate_presigned_url(page.get_pdf_key(),"GET", "application/pdf") 
+        page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET", "audio/mpeg")
+        return page_dict

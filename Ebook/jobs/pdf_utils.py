@@ -28,18 +28,19 @@ def find_bounding_box(listStartPoints, listEndPoints):
 
 # Lấy các câu
 def get_text(wordList):
-    text = ""
-    for (idx, word) in enumerate(wordList):
-        text+=word[4]+" "
-        if idx == len(wordList)-1:
-            text+=word[4]
+    text = " ".join([word[4] for word in wordList])
+    # for (idx, word) in enumerate(wordList):
+    #     text+=word[4]+" "
+    #     if idx == len(wordList)-1:
+    #         text+=word[4]
     return text
 
 # Hợp nhất bounding box của các từ trong câu thành các bounding box của các dòng
 def merge_bounding_box(wordList):
     startPoints = [(word[0], word[1]) for word in wordList]
     endPoints = [(word[2], word[3]) for word in wordList]
-
+    if len(wordList) == 0:
+        return [],[]
     # Lưu nhóm các bounding box nằm trên cùng 1 dòng
     lineGroupStartPoints=[]
     lineGroupEndPoints=[]

@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import traceback
+from io import BytesIO
 
 import fitz
 import pytesseract
@@ -12,8 +13,15 @@ from celery import Celery
 from celery.utils.log import get_task_logger
 from cloud.minio_utils import config, minio_client
 from database.models import *
+from gtts import gTTS
 from jobs.pdf_utils import *
 from PIL import Image
+from pydub import AudioSegment
+
+AudioSegment.converter = "C:\\ffmpeg\\ffmpeg\\bin\\ffmpeg.exe"
+AudioSegment.ffmpeg = "C:\\ffmpeg\\ffmpeg\\bin\\ffmpeg.exe"
+AudioSegment.ffprobe ="C:\\ffmpeg\\ffmpeg\\bin\\ffprobe.exe"
+
 
 # If you don't have tesseract executable in your PATH, include the following:
 pytesseract.pytesseract.tesseract_cmd = r'D:/Tesseract/tesseract'
@@ -79,9 +87,7 @@ def split_page_pdf(page_id, page_number,page_pdf_object_key, page_img_object_key
         logger.info(f"page {page_id} image create", x.status_code)
         return {"page_id": page_id, "image_status": Status.READY, "pdf_status": Status.READY}
     except Exception as e:
-        with open('errors.log', 'a') as fh:
-            print('--\n\n{0}'.format(traceback), file=fh)
-            traceback.print_exc(file=fh)
+        on_error(e)
         requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"pdf_status": Status.ERROR})
         requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"image_status": Status.ERROR})
         return {"page_id": page_id, "image_status": Status.ERROR, "pdf_status": Status.ERROR}
@@ -133,9 +139,7 @@ def bounding_box_preprocess(page_id, pdf_object_key):
         x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"sentences": metadata, "bounding_box_status": Status.READY})
         return x.json()
     except Exception as e:
-        with open('errors.log', 'a') as fh:
-            print('--\n\n{0}'.format(traceback), file=fh)
-            traceback.print_exc(file=fh)
+        on_error(e)
         x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"bounding_box_status": Status.ERROR})
         return {"page_id": page_id, "bounding_box_status": Status.ERROR}
 
@@ -165,3 +169,50 @@ def on_error(e):
         traceback.print_exc(file=fh)
     print(e)
     
+
+
+def convert_text_to_pydub_audio_segment(text, language="en"):
+    gtts_object = gTTS(text = text, 
+                       lang = language,
+                       slow = False)
+    audio_bytes = BytesIO()
+    gtts_object.write_to_fp(audio_bytes)
+    audio_bytes.seek(0)
+    return AudioSegment.from_file(audio_bytes, format="mp3")
+
+def merge_audio_segments(audio_segment_list):
+    main_audio = audio_segment_list[0]
+    for segment in audio_segment_list[1:]:
+        main_audio += segment
+    return main_audio
+
+@pdf_app.task()
+def text_to_speech(page_id, page_audio_object_key):
+    try:
+        get_response = requests.get(f"{APP_HOST}/api/page/{page_id}")
+        sentence_list = get_response.json()['sentences']
+        audio_segment_list = []
+        for sentence in sentence_list:
+            text = sentence['text']
+            if not text:
+                continue
+            audio_segment = convert_text_to_pydub_audio_segment(text)
+            audio_segment_list.append(audio_segment)
+            sentence["audio_timestamp"] = audio_segment.duration_seconds
+        get_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json={"sentences": sentence_list})
+        if len(audio_segment_list) > 0:
+            main_audio = merge_audio_segments(audio_segment_list)
+            raw_audio = BytesIO()
+            main_audio.export(raw_audio, format="mp3")
+            raw_audio_size = raw_audio.getbuffer().nbytes
+            minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
+                                    object_name = page_audio_object_key, 
+                                    data = raw_audio, 
+                                    length= raw_audio_size,
+                                    content_type = 'audio/mpeg')
+        update_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"audio_status": Status.READY})
+        return {"page_id": page_id, "audio_status": Status.READY}
+    except Exception as e:
+        on_error(e)
+        requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"audio_status": Status.ERROR})
+        return {"page_id": page_id, "audio_status": Status.ERROR}

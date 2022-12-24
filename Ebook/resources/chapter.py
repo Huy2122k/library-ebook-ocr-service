@@ -1,3 +1,4 @@
+from bson.objectid import ObjectId
 from cloud.minio_utils import *
 from database.models import Book, Chapter, Page
 from flask import Response, request
@@ -37,7 +38,6 @@ class ChaptersApi(Resource):
         except Exception as e:
             raise InternalServerError
 
-
 class ChapterApi(Resource):
     def get(self, chapter_id):
         try:
@@ -51,6 +51,13 @@ class ChapterApi(Resource):
     def put(self, chapter_id):
         try:
             body = request.get_json()
+            if "pages" in body:
+                chapter = Chapter.objects.get(id=chapter_id)
+                chapter.pages=[ObjectId(page_id) for page_id in body.pop("pages")]
+                if body:
+                    chapter.update(**body)
+                chapter.save()
+                return 'update successful', 200
             Chapter.objects.get(id=chapter_id).update(**body)
             return 'update successful', 200
         except InvalidQueryError:

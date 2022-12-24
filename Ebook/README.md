@@ -1,8 +1,51 @@
-<h1 align="center"> Flask-CRUD-REST-API </h1>
+# Using Ebook to main folder
 
-> <h2 align="center"> Flask based CRUD REST API for Movies using Flask-Restful and MongoDB </h2>
+```
+cd Ebook
+```
 
+# Install
+
+## Python env (options)
+
+```
+python3 -m venv yourenvpath
+source yourenvpath/bin/activate
+```
+
+## Library
+
+```
+pip install -r requirements.txt
+```
+
+## env
+
+config your .env and cloud/env.cloud
+
+## addition
+
+- mongodb + ffmpeg
+- todo: use docker instead
+
+# How to run
+
+service
+
+```
 docker compose -f jobs/queue.yml up -d
+docker compose -f cloud/docker-compose.yml up -d
+```
 
+workers
+
+```
 celery -A pdf_task.pdf_app worker --pool=solo --loglevel=info
 celery -A pdf_task.pdf_app flower --address=127.0.0.6 --port=5566 --broker=amqp://admin:mypass@localhost:5672
+```
+
+server
+
+```
+python run.py
+```

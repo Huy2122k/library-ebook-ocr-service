@@ -57,7 +57,7 @@ class Page(db.Document):
     def get_audio_key(self):
         return f"{self.chapter.book_id}/chapter_{self.chapter.chapter_number}/page_audio/page_{self.page_number}_{self.id}.mp3"
 
-class AwesomerQuerySet(QuerySet):
+class ChapterCustomQuerySet(QuerySet):
     def get_chapters_detail(self):
         chapters = self.all()
         response = []
@@ -68,7 +68,7 @@ class AwesomerQuerySet(QuerySet):
                 page_dict = json.loads(page.to_json())
                 page_dict["presigned_img"] = generate_presigned_url(page.get_image_key(),"GET", "image/*") 
                 page_dict["presigned_pdf"] =  generate_presigned_url(page.get_pdf_key(),"GET", "application/pdf") 
-                page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET") 
+                page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET", "audio/mpeg") 
                 chapter_dict["pages"].append(page_dict)
             chapter_dict["status"] = chapter.status
             response.append(chapter_dict)
@@ -92,11 +92,13 @@ class Chapter(db.Document):
                 'unique': False  
             },
         ],
-        'queryset_class': AwesomerQuerySet
+        'queryset_class': ChapterCustomQuerySet
     }
     def get_pdf_key(self):
         return f"{self.book_id}/chapter_{self.chapter_number}/{self.id}.pdf" 
     def check_status(self, attribute):
+        if len(self.pages) == 0:
+            return "new"
         if any(page[attribute] == Status.ERROR for page in self.pages):
             return "error"
         elif all(page[attribute] == Status.READY for page in self.pages):

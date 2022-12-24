@@ -5,3 +5,6 @@ ocr/output_temp
 minio
 Ebook/cloud/.env.cloud
 */*.log
+*/cloud/data
+ffmpeg
+./cache
