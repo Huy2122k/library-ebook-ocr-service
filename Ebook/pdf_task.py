@@ -1,14 +1,11 @@
 import copy
 import io
 import os
-import pickle
-import sys
 import traceback
 from io import BytesIO
 
 import fitz
 import pytesseract
-import redis
 import requests
 from celery import Celery
 from celery.utils.log import get_task_logger
@@ -19,25 +16,20 @@ from jobs.pdf_utils import *
 from PIL import Image
 from pydub import AudioSegment
 
-AudioSegment.converter = "C:\\ffmpeg\\ffmpeg\\bin\\ffmpeg.exe"
-AudioSegment.ffmpeg = "C:\\ffmpeg\\ffmpeg\\bin\\ffmpeg.exe"
-AudioSegment.ffprobe ="C:\\ffmpeg\\ffmpeg\\bin\\ffprobe.exe"
-
-
 # If you don't have tesseract executable in your PATH, include the following:
-pytesseract.pytesseract.tesseract_cmd = r'D:/Tesseract/tesseract'
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 # cache = redis.Redis(host='localhost', port=6379, db=0,  password ="eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81")
 
 logger = get_task_logger(__name__)
 
 
-APP_HOST = 'http://localhost:3500'
+APP_HOST = 'http://server:3500'
 
 
 pdf_app = Celery('pdf_process',
-             broker='amqp://admin:mypass@localhost:5672',
-             backend='mongodb://localhost:27017/mydb')
+             broker='amqp://admin:mypass@rabbit:5672',
+             backend='mongodb://mongodb-docker:27017/mydb')
 
 
 
@@ -145,6 +137,57 @@ def bounding_box_preprocess(page_id, pdf_object_key):
         return {"page_id": page_id, "bounding_box_status": Status.ERROR}
 
 @pdf_app.task()
+def merge_chapter_pdf(chapter_id, page_pdf_object_key_list, chapter_pdf_object_key):
+    try:
+        chapter = requests.get(f"{APP_HOST}/api/chapters/{chapter_id}").json()
+        if chapter["status"]["pdf_status"] != "ready":
+            return f"chapter {chapter_id} pdf merge incomplete!"
+        logger.info(f"chapter {chapter_id} is merging pdf")
+        page_pdf_object_key_list = json.loads(page_pdf_object_key_list)
+        chapter_doc = fitz.open()
+        for object_key in page_pdf_object_key_list:
+            response = minio_client.get_object(config["BASE_BUCKET"], object_key)
+            doc = fitz.open("pdf", response.data)
+            chapter_doc.insert_pdf(doc)
+        pdf_data = chapter_doc.tobytes()
+        raw_pdf = BytesIO(pdf_data)
+        raw_pdf_size = raw_pdf.getbuffer().nbytes
+        minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
+                                object_name = chapter_pdf_object_key, 
+                                data = raw_pdf, 
+                                length= raw_pdf_size,
+                                content_type = 'application/pdf')
+        return f"chapter {chapter_id} 's pdf is merged successfully!"
+    except Exception as e:
+        on_error(e)
+        return f"chapter {chapter_id}  pdf merge is error!"
+
+@pdf_app.task()
+def concat_audio(chapter_id, page_audio_object_key_list, chapter_audio_object_key):
+    try:
+        chapter = requests.get(f"{APP_HOST}/api/chapters/{chapter_id}").json()
+        if chapter["status"]["audio_status"] != "ready":
+            return f"chapter {chapter_id} audio concat incomplete!"
+        audio_segment_list = []
+        page_audio_object_key_list = json.loads(page_audio_object_key_list)
+        for object_key in page_audio_object_key_list:
+            response = minio_client.get_object(config["BASE_BUCKET"], object_key)
+            audio_segment_list.append(AudioSegment.from_file(BytesIO(response.data), format="mp3"))
+        audio = merge_audio_segments(audio_segment_list)
+        raw_audio = BytesIO()
+        audio.export(raw_audio, format="mp3")
+        raw_audio_size = raw_audio.getbuffer().nbytes
+        minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
+                                object_name = chapter_audio_object_key, 
+                                data = raw_audio, 
+                                length= raw_audio_size,
+                                content_type = 'audio/mpeg')
+        return "success"
+    except Exception as e:
+        on_error(e)
+        return f"chapter {chapter_id}  audio merge is error!"
+
+@pdf_app.task()
 def create_ocr_page(page_id, img_object_key, pdf_object_key):
     try:
         response = minio_client.get_object(config["BASE_BUCKET"], img_object_key)
@@ -191,7 +234,7 @@ def merge_audio_segments(audio_segment_list):
 def text_to_speech(page_id, page_audio_object_key):
     try:
         get_response = requests.get(f"{APP_HOST}/api/page/{page_id}")
-        sentence_list = copy.deepcopy(get_response.json()['sentences'])
+        sentence_list = json.loads(json.dumps(get_response.json()['sentences']))
         audio_segment_list = []
         for sentence in sentence_list:
             text = sentence['text']
@@ -200,6 +243,7 @@ def text_to_speech(page_id, page_audio_object_key):
             audio_segment = convert_text_to_pydub_audio_segment(text)
             audio_segment_list.append(audio_segment)
             sentence["audio_timestamp"] = audio_segment.duration_seconds
+            del sentence["page"]
         get_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json={"sentences": sentence_list})
         if len(audio_segment_list) > 0:
             main_audio = merge_audio_segments(audio_segment_list)

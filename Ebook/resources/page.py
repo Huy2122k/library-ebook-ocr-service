@@ -3,13 +3,14 @@ import json
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from cloud.minio_utils import *
-from database.models import Chapter, Page, Sentence
+from database.models import Chapter, Page, Sentence, Status
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
 from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
+from pdf_task import *
 from resources.base_errors import InvalidIdReq
 from resources.page_errors import (DeletingPageError, InternalServerError,
                                    PageAlreadyExistsError, PageNotExistsError,
@@ -63,9 +64,17 @@ class PageApi(Resource):
                 print(body["sentences"])
                 page =  Page.objects.get(id=page_id)
                 page.update(
-                    sentences= [Sentence(**se, page = page) for se in body["sentences"]], 
-                    bounding_box_status=body["bounding_box_status"]
+                    sentences= [Sentence(**se, page = page) for se in body["sentences"]]
                 )
+                if "bounding_box_status" in body:
+                    page.update(
+                    bounding_box_status=body["bounding_box_status"]
+                    )
+                if "need_audio_process" in body and body["need_audio_process"]:
+                    text_to_speech.si(str(page.id), page.get_audio_key()).apply_async()
+                    page.update(
+                        audio_status = Status.PROCESSING
+                    )
                 page.save()
                 return {"page_id": page_id,"msg":"create sentences successful"}, 200
             Page.objects.get(id=page_id).update(**body)

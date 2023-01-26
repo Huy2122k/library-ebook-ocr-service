@@ -8,3 +8,4 @@ Ebook/cloud/.env.cloud
 */cloud/data
 ffmpeg
 ./cache
+Tesseract/

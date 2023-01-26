@@ -13,7 +13,14 @@ services:
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: password
-
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb-docker
+    ports:
+      - 27017:27017
+    volumes:
+      # seeding scripts
+      - ./mongo-data:/data
   cache:
     image: redis:6.2-alpine
     restart: always
@@ -22,6 +29,42 @@ services:
     command: redis-server --save 20 1 --loglevel warning --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
     volumes:
       - ./Ebook/cache:/data
+  server:
+    image: ebook-server
+    restart: always
+    ports:
+      - 3500:3500
+    volumes:
+      - ./Ebook:/source/Ebook
+      - ./start-server.sh:/sourcecode/start-server.sh
+    entrypoint: ["/bin/sh"]
+    command: /sourcecode/start-server.sh
+    depends_on:
+      - mongodb
+
+  workers:
+    image: ebook-server
+    restart: always
+    container_name: worker-pdfs
+    volumes:
+      - ./Ebook:/source/Ebook
+      - ./start-workers.sh:/sourcecode/start-workers.sh
+    entrypoint: ["/bin/sh"]
+    command: /sourcecode/start-workers.sh
+
+  monitor:
+    image: ebook-server
+    restart: always
+    container_name: monitor-flower
+    volumes:
+      - ./Ebook:/source/Ebook
+      - ./start-monitor.sh:/sourcecode/start-monitor.sh
+    entrypoint: ["/bin/sh"]
+    ports:
+      - 5566:5566
+    command: /sourcecode/start-monitor.sh
+    depends_on:
+      - workers
 
   rabbit:
     hostname: rabbit

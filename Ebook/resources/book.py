@@ -2,7 +2,7 @@ import json
 
 from celery import chain
 from cloud.minio_utils import *
-from database.models import Book, Chapter, EbookType
+from database.models import Book, Chapter, EbookType, Sentence
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
@@ -11,9 +11,31 @@ from pdf_task import *
 
 class BooksApi(Resource):
     def get(self):
-        query = Book.objects()
-        res = query.to_json()
-        return Response(res, mimetype="application/json", status=200)
+        params = request.args.to_dict()
+        if "text_search" in params:
+            pages = Page.objects(sentences__text__contains=params['text_search'])
+            list_book_id = [page.chapter.book_id for page in pages]
+            result_search = {}
+            for page in pages:
+                chapter = page.chapter
+                if chapter.id in result_search:
+                    result_search[chapter.id]["pages"] += {"page": str(page.id), "page_number": page.page_number} 
+                    continue
+                result_search[chapter.id] = {"id": str(chapter.id), "chapter_name": chapter.chapter_number, "chapter_number": chapter.chapter_number, "pages":[{"page": str(page.id), "page_number": page.page_number} ]}
+            books = json.loads(Book.objects(book_id__in=list_book_id).to_json())
+            for book in books:
+                results = []
+                lst_chapter = set([page.chapter.id for page in pages  if page.chapter.book_id == book["book_id"]])
+                for chapter_id in lst_chapter:
+                    results.append(result_search[chapter_id])
+                print(results)
+                book['search_result'] = results
+            return  books, 200
+            # return Response(Sentence.objects.search_text(params['text_search']).order_by('$text_score'), status=200)
+        else:
+            query = Book.objects()
+            res = query.to_json()
+            return Response(res, mimetype="application/json", status=200)
 
     # @jwt_required
     def post(self):

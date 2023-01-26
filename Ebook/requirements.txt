@@ -13,3 +13,4 @@ PyMuPDF
 celery[mongodb]
 redis
 flower
+requests

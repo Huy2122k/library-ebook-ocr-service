@@ -29,7 +29,7 @@ class Sentence(db.EmbeddedDocument):
     meta = {
         'indexes': [
             {
-                'fields': "text", 
+                'fields': "$text", 
             }
         ]
     }
@@ -71,6 +71,8 @@ class ChapterCustomQuerySet(QuerySet):
                 page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET", "audio/mpeg") 
                 chapter_dict["pages"].append(page_dict)
             chapter_dict["status"] = chapter.status
+            chapter_dict["pdf_link"] = generate_presigned_url(chapter.get_pdf_key(),"GET", "application/pdf") 
+            chapter_dict["audio_link"] = generate_presigned_url(chapter.get_audio_key(),"GET", "audio/mpeg") 
             response.append(chapter_dict)
         return response
 class Chapter(db.Document):
@@ -94,8 +96,15 @@ class Chapter(db.Document):
         ],
         'queryset_class': ChapterCustomQuerySet
     }
+    def get_public_urls(self):
+        return {
+            "pdf":generate_presigned_url(self.get_pdf_key(),"GET", "application/pdf"),
+            "audio": generate_presigned_url(self.get_audio_key(),"GET", "audio/mpeg") 
+        }
     def get_pdf_key(self):
         return f"{self.book_id}/chapter_{self.chapter_number}/{self.id}.pdf" 
+    def get_audio_key(self):
+        return f"{self.book_id}/chapter_{self.chapter_number}/{self.id}.mp3" 
     def check_status(self, attribute):
         if len(self.pages) == 0:
             return "new"

@@ -27,7 +27,12 @@ class OcrApi(Resource):
                         if page.audio_status != Status.READY:
                             text_to_speech.si(str(page.id), page.get_audio_key()).apply_async()
                         continue
-                    (create_ocr_page.si(str(page.id), page.get_image_key(), page.get_pdf_key()) | bounding_box_preprocess.si(str(page.id), page.get_pdf_key()) | text_to_speech.si(str(page.id), page.get_audio_key())).apply_async()
+                    ( create_ocr_page.si(str(page.id), page.get_image_key(), page.get_pdf_key()) 
+                        | bounding_box_preprocess.si(str(page.id), page.get_pdf_key()) 
+                        | text_to_speech.si(str(page.id), page.get_audio_key())
+                        | merge_chapter_pdf.si(str(page.chapter.id), json.dumps([ p.get_pdf_key() for p in page.chapter.pages]), page.chapter.get_pdf_key())
+                        | concat_audio.si(str(page.chapter.id), json.dumps([ p.get_audio_key() for p in page.chapter.pages]), page.chapter.get_audio_key())
+                    ).apply_async()
                     page.update(pdf_status=Status.PROCESSING,bounding_box_status=Status.PROCESSING, audio_status = Status.PROCESSING )
                     page.save()
                 return f'successful OCR', 200

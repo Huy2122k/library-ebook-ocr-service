@@ -1,6 +1,6 @@
 # from .auth import LoginApi, SignupApi
 from .book import BookApi, BooksApi
-from .chapter import ChapterApi, ChaptersApi
+from .chapter import ChapterApi, ChapterGetAllApi, ChaptersApi
 from .ocr import OcrApi
 from .page import PageApi, PagesApi
 from .urls import PreSignUrlApi
@@ -18,7 +18,7 @@ def initialize_routes(api):
 
     api.add_resource(BooksApi, '/api/books')
     api.add_resource(BookApi, '/api/books/<book_id>')
-
+    api.add_resource(ChapterGetAllApi, '/api/chapter_meta/<chapter_id>')
     
     api.add_resource(OcrApi, '/api/ocr')
     api.add_resource(PreSignUrlApi, '/api/presigned')
