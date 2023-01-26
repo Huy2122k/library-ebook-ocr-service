@@ -38,7 +38,8 @@ def split_page_pdf(page_id, page_number,page_pdf_object_key, page_img_object_key
     try:
         # caching is error now
         # book_cached = cache.get(book_pdf_object_key)
-        cache_path = f"cache/{book_pdf_object_key}"
+        cache_path = f"cache/{book_pdf_object_key.split('/')[-1]}"
+        print(book_pdf_object_key)
         if not os.path.exists(cache_path):
             response = minio_client.get_object(config["BASE_BUCKET"], book_pdf_object_key)
             bookDoc = fitz.open("pdf", response.data)
@@ -57,7 +58,12 @@ def split_page_pdf(page_id, page_number,page_pdf_object_key, page_img_object_key
         page_data_pdf = fitz.open() # an empty pdf file is opened
         page_data_pdf.insert_pdf(bookDoc, from_page=page_number, to_page=page_number)
 
-        data = page_data_pdf.tobytes()
+        # Resize PDF to A4
+        resize_doc = fitz.open()  # new empty PDF
+        page = resize_doc.new_page()  # new page in A4 format
+        page.show_pdf_page(page.rect, page_data_pdf, 0)
+
+        data = resize_doc.tobytes()
         raw_pdf = io.BytesIO(data)
         raw_pdf_size = raw_pdf.getbuffer().nbytes
         minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
@@ -193,13 +199,32 @@ def create_ocr_page(page_id, img_object_key, pdf_object_key):
         response = minio_client.get_object(config["BASE_BUCKET"], img_object_key)
         im = Image.open(response)
         pdf = pytesseract.image_to_pdf_or_hocr(im, extension='pdf')
-        raw_pdf = io.BytesIO(pdf)
+
+        doc = fitz.open("pdf", pdf)
+        resize_doc = fitz.open()  # new empty PDF
+        page = resize_doc.new_page()  # new page in A4 format
+        page.show_pdf_page(page.rect, doc, 0)
+
+        pdf_data = resize_doc.tobytes()
+        raw_pdf = io.BytesIO(pdf_data)
         raw_pdf_size = raw_pdf.getbuffer().nbytes
         minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
                                 object_name = pdf_object_key, 
                                 data = raw_pdf, 
                                 length= raw_pdf_size,
                                 content_type = 'application/pdf')
+
+        pix = resize_doc[0].get_pixmap()
+        data = pix.pil_tobytes(format="png", optimize=True)
+        raw_img = io.BytesIO(data)
+        raw_img_size = raw_img.getbuffer().nbytes
+
+        minio_client.put_object(bucket_name = config['BASE_BUCKET'], 
+                        object_name = img_object_key, 
+                        data = raw_img, 
+                        length= raw_img_size,
+                        content_type = 'image/png')
+
         x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"pdf_status": Status.READY})
         return x.json()
     except Exception as e:

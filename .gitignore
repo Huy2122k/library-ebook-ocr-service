@@ -7,5 +7,5 @@ Ebook/cloud/.env.cloud
 */*.log
 */cloud/data
 ffmpeg
-./cache
+Ebook/cache
 Tesseract/

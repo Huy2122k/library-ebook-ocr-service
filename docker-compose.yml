@@ -61,7 +61,7 @@ services:
       - ./start-monitor.sh:/sourcecode/start-monitor.sh
     entrypoint: ["/bin/sh"]
     ports:
-      - 5566:5566
+      - 5555:5555
     command: /sourcecode/start-monitor.sh
     depends_on:
       - workers
