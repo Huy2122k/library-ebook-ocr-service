@@ -9,3 +9,5 @@ Ebook/cloud/.env.cloud
 ffmpeg
 Ebook/cache
 Tesseract/
+queue-data/
+mongo-data

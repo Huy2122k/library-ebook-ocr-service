@@ -130,6 +130,8 @@ class ChapterGetAllApi(Resource):
                         sentences = i.sentences
                         for j in sentences:
                             total_time += j['audio_timestamp']
+                            if "audio_timestamp" not in j:
+                                continue
                             sentence_item = {}
                             sentence_item['pageIndex'] = i['page_number']-1
                             sentence_item['sentenceId'] = f"{i['id']}-{j['index']}"

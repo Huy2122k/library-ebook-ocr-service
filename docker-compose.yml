@@ -15,20 +15,20 @@ services:
       MINIO_ROOT_PASSWORD: password
   mongodb:
     image: mongo:latest
+    restart: always
     container_name: mongodb-docker
     ports:
       - 27017:27017
     volumes:
-      # seeding scripts
       - ./mongo-data:/data
-  cache:
-    image: redis:6.2-alpine
-    restart: always
-    ports:
-      - "6379:6379"
-    command: redis-server --save 20 1 --loglevel warning --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
-    volumes:
-      - ./Ebook/cache:/data
+  # cache:
+  #   image: redis:6.2-alpine
+  #   restart: always
+  #   ports:
+  #     - "6379:6379"
+  #   command: redis-server --save 20 1 --loglevel warning --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
+  #   volumes:
+  #     - ./Ebook/cache:/data
   server:
     image: ebook-server
     restart: always
@@ -76,6 +76,8 @@ services:
     ports:
       - "15672:15672"
       - "5672:5672"
+    volumes:
+      - ./queue-data:/var/lib/rabbitmq
 # volumes:
 #   cache:
 #     driver: local

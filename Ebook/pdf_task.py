@@ -177,7 +177,10 @@ def concat_audio(chapter_id, page_audio_object_key_list, chapter_audio_object_ke
         audio_segment_list = []
         page_audio_object_key_list = json.loads(page_audio_object_key_list)
         for object_key in page_audio_object_key_list:
-            response = minio_client.get_object(config["BASE_BUCKET"], object_key)
+            try:
+                response = minio_client.get_object(config["BASE_BUCKET"], object_key)
+            except Exception as e:
+                continue
             audio_segment_list.append(AudioSegment.from_file(BytesIO(response.data), format="mp3"))
         audio = merge_audio_segments(audio_segment_list)
         raw_audio = BytesIO()
@@ -261,15 +264,17 @@ def text_to_speech(page_id, page_audio_object_key):
         get_response = requests.get(f"{APP_HOST}/api/page/{page_id}")
         sentence_list = json.loads(json.dumps(get_response.json()['sentences']))
         audio_segment_list = []
+        sentence_new_list = []
         for sentence in sentence_list:
             text = sentence['text']
-            if not text:
+            del sentence["page"]
+            if not text or text.strip() == '' :
                 continue
             audio_segment = convert_text_to_pydub_audio_segment(text)
             audio_segment_list.append(audio_segment)
             sentence["audio_timestamp"] = audio_segment.duration_seconds
-            del sentence["page"]
-        get_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json={"sentences": sentence_list})
+            sentence_new_list.append(sentence)
+        put_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json={"sentences": sentence_new_list})
         if len(audio_segment_list) > 0:
             main_audio = merge_audio_segments(audio_segment_list)
             raw_audio = BytesIO()
