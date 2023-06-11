@@ -10,6 +10,7 @@ from mongoengine.connection import get_connection
 from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
+from pdf_task import *
 from resources.chapter_errors import (ChapterAlreadyExistsError,
                                       ChapterNotExistsError,
                                       DeletingChapterError,
@@ -66,6 +67,9 @@ class ChapterApi(Resource):
                 if body:
                     chapter.update(**body)
                 chapter.save()
+                (   merge_chapter_pdf.si(str(chapter.id), json.dumps([ p.get_pdf_key() for p in chapter.pages]), chapter.get_pdf_key())
+                    | concat_audio.si(str(chapter.id), json.dumps([ p.get_audio_key() for p in chapter.pages]), chapter.get_audio_key())
+                ).apply_async()
                 return 'update successful', 200
             Chapter.objects.get(id=chapter_id).update(**body)
             return 'update successful', 200
@@ -122,18 +126,18 @@ class ChapterGetAllApi(Resource):
                 try:
                     chapter = Chapter.objects.get(id=chapter_id)
                     num_chapter = len(Chapter.objects(book_id=chapter.book_id))
-                    pages = Page.objects(chapter=chapter_id).order_by('page_number')
+                    pages = chapter.pages
                     sentence_list = []
-                    time_between_sentence = 0.048 # Thời gian giữa 2 câu
+                    time_between_sentence = 0.0 # Thời gian giữa 2 câu
                     total_time = 0
                     for i in pages:
                         sentences = i.sentences
                         for j in sentences:
-                            total_time += j['audio_timestamp']
                             if "audio_timestamp" not in j:
                                 continue
+                            total_time += j['audio_timestamp']
                             sentence_item = {}
-                            sentence_item['pageIndex'] = i['page_number']-1
+                            sentence_item['pageIndex'] = pages.index(i)
                             sentence_item['sentenceId'] = f"{i['id']}-{j['index']}"
                             sentence_item['endTime'] = total_time
                             sentence_item['duration'] = j['audio_timestamp']
@@ -141,11 +145,12 @@ class ChapterGetAllApi(Resource):
                             bounding_box_list = []
                             for k in j['bounding_box']:
                                 bounding_box_list.append({
-                                    'pageIndex': i['page_number']-1,
+                                    'pageIndex': pages.index(i),
                                     'left': (k['x']/595)*100,
                                     'top': (k['y']/842)*100,
                                     'width': (k['width']/595)*100,
-                                    'height': (k['height']/842)*100
+                                    'height': (k['height']/842)*100,
+                                    "text": j["text"]
                                 })
                             sentence_item['highlightAreas'] = bounding_box_list
                             sentence_list.append(sentence_item)

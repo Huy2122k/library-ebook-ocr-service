@@ -40,25 +40,31 @@ def merge_bounding_box(wordList):
     startPoints = [(word[0], word[1]) for word in wordList]
     endPoints = [(word[2], word[3]) for word in wordList]
     if len(wordList) == 0:
-        return [],[]
+        return [], [], []
     # Lưu nhóm các bounding box nằm trên cùng 1 dòng
     lineGroupStartPoints=[]
     lineGroupEndPoints=[]
+    lineGroupTexts =[]
 
     tempStartPoints=[startPoints[0]]
     tempEndPoints=[endPoints[0]]
+    tempTexts = wordList[0][4]
     for i in range((len(startPoints)-1)):
         if startPoints[i+1][0]>startPoints[i][0]:
             tempStartPoints.append(startPoints[i+1])
             tempEndPoints.append(endPoints[i+1])
+            tempTexts += (" " + wordList[i+1][4])
         else:
             lineGroupStartPoints.append(tempStartPoints)
             lineGroupEndPoints.append(tempEndPoints)
+            lineGroupTexts.append(tempTexts)
             tempStartPoints=[startPoints[i+1]]
             tempEndPoints=[endPoints[i+1]]
-        if i == len(startPoints)-2:
+            tempTexts=wordList[i+1][4]
+        if i >= len(startPoints)-2:
             lineGroupStartPoints.append(tempStartPoints)
             lineGroupEndPoints.append(tempEndPoints)
+            lineGroupTexts.append(tempTexts)
     
     # Lưu bounding box sau khi đã được merge
     lineStartPoints=[]
@@ -68,7 +74,7 @@ def merge_bounding_box(wordList):
         lineStartPoints.append(startPoint)
         lineEndPoints.append(endPoint)
     
-    return lineStartPoints, lineEndPoints
+    return lineStartPoints, lineEndPoints, lineGroupTexts
 
 # Chuyển thông tin bounding box từ top left/bottom right
 # sang x_top_left/y_top_left/width/height

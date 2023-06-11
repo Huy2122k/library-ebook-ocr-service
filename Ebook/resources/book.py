@@ -12,23 +12,22 @@ from pdf_task import *
 class BooksApi(Resource):
     def get(self):
         params = request.args.to_dict()
-        if "text_search" in params:
-            pages = Page.objects(sentences__text__contains=params['text_search'])
+        if "text_search" in params and params["text_search"]:
+            pages = Sentence.objects.search_text(params['text_search']).order_by('$text_score').distinct("page")
             list_book_id = [page.chapter.book_id for page in pages]
             result_search = {}
             for page in pages:
                 chapter = page.chapter
                 if chapter.id in result_search:
-                    result_search[chapter.id]["pages"] += {"page": str(page.id), "page_number": page.page_number} 
+                    result_search[chapter.id]["pages"] += [{"page": str(page.id), "page_number": page.page_number}]
                     continue
-                result_search[chapter.id] = {"id": str(chapter.id), "chapter_name": chapter.chapter_number, "chapter_number": chapter.chapter_number, "pages":[{"page": str(page.id), "page_number": page.page_number} ]}
+                result_search[chapter.id] = {"id": str(chapter.id), "chapter_name": chapter.chapter_name, "chapter_number": chapter.chapter_number, "pages":[{"page": str(page.id), "page_number": page.page_number} ]}
             books = json.loads(Book.objects(book_id__in=list_book_id).to_json())
             for book in books:
                 results = []
                 lst_chapter = set([page.chapter.id for page in pages  if page.chapter.book_id == book["book_id"]])
                 for chapter_id in lst_chapter:
                     results.append(result_search[chapter_id])
-                print(results)
                 book['search_result'] = results
             return  books, 200
             # return Response(Sentence.objects.search_text(params['text_search']).order_by('$text_score'), status=200)

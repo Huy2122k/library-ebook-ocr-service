@@ -20,16 +20,19 @@ class EbookType(str, Enum):
     OCR="ocr",
     OTHER="other"
 
-class Sentence(db.EmbeddedDocument):
+class Sentence(db.Document):
     page = db.ReferenceField('Page', required=True)
     index = db.IntField(required=True)
     text = db.StringField()
+    ocr_texts = db.ListField(default=[])
+    text_search = db.StringField()
     bounding_box = db.ListField(default=[])
     audio_timestamp = db.FloatField(default=None)
     meta = {
         'indexes': [
             {
-                'fields': "$text", 
+                'fields': ["$text_search"],
+                'default_language': 'english' 
             }
         ]
     }
@@ -41,7 +44,7 @@ class Page(db.Document):
     bounding_box_status = db.EnumField(Status, default=Status.NEW, validators=None)
     audio_status = db.EnumField(Status, default=Status.NEW, validators=None)
     audio_length = db.FloatField()
-    sentences = db.ListField(db.EmbeddedDocumentField('Sentence'), default=[])
+    sentences = db.ListField(db.ReferenceField('Sentence',  reverse_delete_rule=db.PULL), default=[])
     meta = {
         'indexes': [
             {
@@ -159,3 +162,4 @@ class Book(db.Document):
         return f"{self.book_id}/{self.book_id}.pdf"
 
 Chapter.register_delete_rule(Page, 'chapter', db.CASCADE)
+Page.register_delete_rule(Sentence, 'page', db.CASCADE)

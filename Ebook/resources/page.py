@@ -1,5 +1,6 @@
 import json
 
+import unidecode
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from cloud.minio_utils import *
@@ -16,6 +17,9 @@ from resources.page_errors import (DeletingPageError, InternalServerError,
                                    PageAlreadyExistsError, PageNotExistsError,
                                    SchemaValidationError, UpdatingPageError)
 
+
+def remove_accent(text):
+    return unidecode.unidecode(text)
 
 class PagesApi(Resource):
     def get(self):
@@ -58,25 +62,26 @@ class PageApi(Resource):
     # @jwt_required
     def put(self, page_id):
         try:
-            # user_id = get_jwt_identity()
             body = request.get_json()
+            page =  Page.objects.get(id=page_id)
+            # change sentences
             if "sentences" in body:
-                page =  Page.objects.get(id=page_id)
+                # replace all
+                Sentence.objects(page = page).delete()
+                #bulk create
+                new_sentences= [Sentence(**se, text_search=remove_accent(se["text"]), page = page) for se in body["sentences"]]
+                new_sentence_ids = Sentence.objects.insert(new_sentences, load_bulk=False)
                 page.update(
-                    sentences= [Sentence(**se, page = page) for se in body["sentences"]]
+                    sentences = new_sentence_ids
                 )
-                if "bounding_box_status" in body:
-                    page.update(
-                    bounding_box_status=body["bounding_box_status"]
-                    )
-                if "need_audio_process" in body and body["need_audio_process"]:
-                    text_to_speech.si(str(page.id), page.get_audio_key()).apply_async()
-                    page.update(
-                        audio_status = Status.PROCESSING
-                    )
+                del body["sentences"]
+                page.update(
+                    **body
+                )
                 page.save()
                 return {"page_id": page_id,"msg":"create sentences successful"}, 200
-            Page.objects.get(id=page_id).update(**body)
+            #else update
+            page.update(**body)
             return 'successful', 200
         except InvalidQueryError:
             raise SchemaValidationError
@@ -111,4 +116,5 @@ class PageApi(Resource):
         page_dict["presigned_img"] = generate_presigned_url(page.get_image_key(),"GET", "image/*") 
         page_dict["presigned_pdf"] =  generate_presigned_url(page.get_pdf_key(),"GET", "application/pdf") 
         page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET", "audio/mpeg")
+        page_dict['sentences'] = json.loads(Sentence.objects.filter(page=page).to_json())
         return page_dict

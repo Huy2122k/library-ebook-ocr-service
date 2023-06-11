@@ -20,7 +20,7 @@ services:
     ports:
       - 27017:27017
     volumes:
-      - ./mongo-data:/data
+      - ./mongo-data:/data/db:rw
   # cache:
   #   image: redis:6.2-alpine
   #   restart: always
@@ -49,6 +49,7 @@ services:
     volumes:
       - ./Ebook:/source/Ebook
       - ./start-workers.sh:/sourcecode/start-workers.sh
+      - ./vie.traineddata:/usr/share/tesseract-ocr/4.00/tessdata/vie.traineddata
     entrypoint: ["/bin/sh"]
     command: /sourcecode/start-workers.sh
 
@@ -78,6 +79,6 @@ services:
       - "5672:5672"
     volumes:
       - ./queue-data:/var/lib/rabbitmq
-# volumes:
-#   cache:
-#     driver: local
+volumes:
+  cache:
+    driver: local

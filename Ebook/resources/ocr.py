@@ -25,7 +25,10 @@ class OcrApi(Resource):
                 for page in pages:
                     if page.bounding_box_status == Status.READY:
                         if page.audio_status != Status.READY:
-                            text_to_speech.si(str(page.id), page.get_audio_key()).apply_async()
+                            (text_to_speech.si(str(page.id), page.get_audio_key())
+                            | merge_chapter_pdf.si(str(page.chapter.id), json.dumps([ p.get_pdf_key() for p in page.chapter.pages]), page.chapter.get_pdf_key())
+                            | concat_audio.si(str(page.chapter.id), json.dumps([ p.get_audio_key() for p in page.chapter.pages]), page.chapter.get_audio_key())
+                            ).apply_async()
                         continue
                     ( create_ocr_page.si(str(page.id), page.get_image_key(), page.get_pdf_key()) 
                         | bounding_box_preprocess.si(str(page.id), page.get_pdf_key()) 

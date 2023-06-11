@@ -128,12 +128,12 @@ def bounding_box_preprocess(page_id, pdf_object_key):
         sentences = read_page(page)
         metadata = []
         for (sentenceIdx, wordList) in enumerate(sentences):
-            startPoints, endPoints = merge_bounding_box(wordList)
+            startPoints, endPoints, ocr_texts = merge_bounding_box(wordList)
             text = get_text(wordList)
             boundingBox = []
             for (startPoint, endPoint) in zip(startPoints, endPoints):
                 boundingBox.append(convert_bb_type(startPoint, endPoint))
-            info = {'index': sentenceIdx, 'bounding_box': boundingBox, 'text': text}
+            info = {'index': sentenceIdx, 'bounding_box': boundingBox, 'text': text, 'ocr_texts': ocr_texts}
             metadata.append(info)
         x = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"sentences": metadata, "bounding_box_status": Status.READY})
         return x.json()
@@ -201,7 +201,7 @@ def create_ocr_page(page_id, img_object_key, pdf_object_key):
     try:
         response = minio_client.get_object(config["BASE_BUCKET"], img_object_key)
         im = Image.open(response)
-        pdf = pytesseract.image_to_pdf_or_hocr(im, extension='pdf')
+        pdf = pytesseract.image_to_pdf_or_hocr(im, extension='pdf', lang='vie')
 
         doc = fitz.open("pdf", pdf)
         resize_doc = fitz.open()  # new empty PDF
@@ -268,13 +268,15 @@ def text_to_speech(page_id, page_audio_object_key):
         for sentence in sentence_list:
             text = sentence['text']
             del sentence["page"]
+            del sentence["_id"]
+            del sentence["text_search"]
             if not text or text.strip() == '' :
                 continue
             audio_segment = convert_text_to_pydub_audio_segment(text)
             audio_segment_list.append(audio_segment)
             sentence["audio_timestamp"] = audio_segment.duration_seconds
             sentence_new_list.append(sentence)
-        put_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json={"sentences": sentence_new_list})
+            
         if len(audio_segment_list) > 0:
             main_audio = merge_audio_segments(audio_segment_list)
             raw_audio = BytesIO()
@@ -285,7 +287,7 @@ def text_to_speech(page_id, page_audio_object_key):
                                     data = raw_audio, 
                                     length= raw_audio_size,
                                     content_type = 'audio/mpeg')
-        update_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"audio_status": Status.READY})
+        update_response = requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"sentences": sentence_new_list, "audio_status": Status.READY})
         return {"page_id": page_id, "audio_status": Status.READY}
     except Exception as e:
         on_error(e)
