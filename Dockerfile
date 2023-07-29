@@ -16,7 +16,9 @@ RUN apt-get -y install python3.8  \
     python3-pip
     
 RUN cd /source/Ebook & pip install -r requirements.txt
+####
+# for audio processing
 RUN apt-get -y install ffmpeg 
+###
 RUN apt-get -y install tesseract-ocr 
 RUN apt-get -y install libtesseract-dev
-

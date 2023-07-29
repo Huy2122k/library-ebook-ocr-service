@@ -1,5 +1,6 @@
 import copy
 import io
+import json
 import os
 import traceback
 from io import BytesIO
@@ -10,23 +11,23 @@ import requests
 from celery import Celery
 from celery.utils.log import get_task_logger
 from cloud.minio_utils import config, minio_client
-from database.models import *
-from gtts import gTTS
-from jobs.pdf_utils import *
+from database.models import Status
+# for google TTS API
+from google.cloud import texttospeech
+from google.oauth2 import service_account
+from jobs.post_process import *
+from jobs.pre_process import deskew_image
 from PIL import Image
 from pydub import AudioSegment
 
-# If you don't have tesseract executable in your PATH, include the following:
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-
-# cache = redis.Redis(host='localhost', port=6379, db=0,  password ="eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81")
-
 logger = get_task_logger(__name__)
 
+google_credentials = service_account.Credentials.from_service_account_file('credentials/library-audio-book-cec98cdbbdbd.json')
+text_to_speech_client = texttospeech.TextToSpeechClient(credentials=google_credentials)
 
-APP_HOST = 'http://server:3500'
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-
+APP_HOST = 'http://server:3600'
 pdf_app = Celery('pdf_process',
              broker='amqp://admin:mypass@rabbit:5672',
              backend='mongodb://mongodb-docker:27017/mydb')
@@ -36,23 +37,15 @@ pdf_app = Celery('pdf_process',
 @pdf_app.task()
 def split_page_pdf(page_id, page_number,page_pdf_object_key, page_img_object_key, book_pdf_object_key):
     try:
-        # caching is error now
-        # book_cached = cache.get(book_pdf_object_key)
+        # caching 
         cache_path = f"cache/{book_pdf_object_key.split('/')[-1]}"
-        print(book_pdf_object_key)
         if not os.path.exists(cache_path):
             response = minio_client.get_object(config["BASE_BUCKET"], book_pdf_object_key)
             bookDoc = fitz.open("pdf", response.data)
-            print("CACHED!")
+            print("CACHED! ", book_pdf_object_key)
             bookDoc.save(cache_path)
         else:
             bookDoc = fitz.open(cache_path)
-        # if book_cached is None:
-        #     bookDoc = fitz.open("pdf", response.data)
-        #     pickled_object = pickle.dumps(bookDoc)
-        #     cache.set(book_pdf_object_key, pickled_obje
-        # else:
-        #     bookDoc = pickle.loads(book_cached)
         page_data = bookDoc[page_number]
 
         page_data_pdf = fitz.open() # an empty pdf file is opened
@@ -125,7 +118,7 @@ def bounding_box_preprocess(page_id, pdf_object_key):
         response = minio_client.get_object(config["BASE_BUCKET"], pdf_object_key)
         doc = fitz.open("pdf", response.data)
         page = doc[0]
-        sentences = read_page(page)
+        sentences = read_page_new(page)
         metadata = []
         for (sentenceIdx, wordList) in enumerate(sentences):
             startPoints, endPoints, ocr_texts = merge_bounding_box(wordList)
@@ -201,8 +194,9 @@ def create_ocr_page(page_id, img_object_key, pdf_object_key):
     try:
         response = minio_client.get_object(config["BASE_BUCKET"], img_object_key)
         im = Image.open(response)
-        pdf = pytesseract.image_to_pdf_or_hocr(im, extension='pdf', lang='vie')
-
+        im = deskew_image(im)
+        # Tesseract 
+        pdf = pytesseract.image_to_pdf_or_hocr(im, extension='pdf', lang='vie+eng', config=f'--psm 11')
         doc = fitz.open("pdf", pdf)
         resize_doc = fitz.open()  # new empty PDF
         page = resize_doc.new_page()  # new page in A4 format
@@ -242,21 +236,42 @@ def on_error(e):
     print(e)
     
 
+def run_google_text_to_speech(text, lang='en'):
+    synthesis_input = texttospeech.SynthesisInput(text=text)
+    # Build the voice request, select the language code ("en-US") and the ssml
+    # voice gender ("neutral")
+    params_voice = {
+        "language_code": "en-US",
+        "name": "en-US-Standard-H"
+    }
+    if lang =='vi':
+        params_voice = {
+            "language_code": "vi-VN",
+            "name": "vi-VN-Standard-A"
+        }
 
-def convert_text_to_pydub_audio_segment(text, language="vi"):
-    gtts_object = gTTS(text = text, 
-                       lang = language,
-                       slow = False)
-    audio_bytes = BytesIO()
-    gtts_object.write_to_fp(audio_bytes)
-    audio_bytes.seek(0)
-    return AudioSegment.from_file(audio_bytes, format="mp3")
+    voice = texttospeech.VoiceSelectionParams(**params_voice)
+    # Select the type of audio file you want returned
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3
+    )
+
+    # Perform the text-to-speech request on the text input with the selected
+    # voice parameters and audio file type
+    response = text_to_speech_client.synthesize_speech(
+        input=synthesis_input, voice=voice, audio_config=audio_config
+    )
+    audio_bytes = BytesIO(response.audio_content)
+    audio_segment = AudioSegment.from_file(audio_bytes, format="mp3")
+    
+    return audio_segment
 
 def merge_audio_segments(audio_segment_list):
-    main_audio = audio_segment_list[0]
-    for segment in audio_segment_list[1:]:
-        main_audio += segment
-    return main_audio
+    if len(audio_segment_list) > 0:
+        main_audio = audio_segment_list[0]
+        for segment in audio_segment_list[1:]:
+            main_audio += segment
+        return main_audio
 
 @pdf_app.task()
 def text_to_speech(page_id, page_audio_object_key):
@@ -267,12 +282,14 @@ def text_to_speech(page_id, page_audio_object_key):
         sentence_new_list = []
         for sentence in sentence_list:
             text = sentence['text']
+            language = sentence['language_detect']
+            del sentence["language_detect"]
             del sentence["page"]
             del sentence["_id"]
             del sentence["text_search"]
             if not text or text.strip() == '' :
                 continue
-            audio_segment = convert_text_to_pydub_audio_segment(text)
+            audio_segment = run_google_text_to_speech(text, language)
             audio_segment_list.append(audio_segment)
             sentence["audio_timestamp"] = audio_segment.duration_seconds
             sentence_new_list.append(sentence)
@@ -293,3 +310,4 @@ def text_to_speech(page_id, page_audio_object_key):
         on_error(e)
         requests.put(f"{APP_HOST}/api/page/{page_id}", json = {"audio_status": Status.ERROR})
         return {"page_id": page_id, "audio_status": Status.ERROR}
+    

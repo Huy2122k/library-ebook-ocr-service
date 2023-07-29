@@ -1,7 +1,6 @@
 import json
 
 from bson.objectid import ObjectId
-from cloud.minio_utils import *
 from database.models import Book, Chapter, Page
 from flask import Response, jsonify, make_response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -10,7 +9,7 @@ from mongoengine.connection import get_connection
 from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
-from pdf_task import *
+from pdf_task import concat_audio, merge_chapter_pdf
 from resources.chapter_errors import (ChapterAlreadyExistsError,
                                       ChapterNotExistsError,
                                       DeletingChapterError,
@@ -126,6 +125,7 @@ class ChapterGetAllApi(Resource):
                 try:
                     chapter = Chapter.objects.get(id=chapter_id)
                     num_chapter = len(Chapter.objects(book_id=chapter.book_id))
+                    all_chapters = Chapter.objects(book_id=chapter.book_id).order_by('chapter_number').all().values_list('id')
                     pages = chapter.pages
                     sentence_list = []
                     time_between_sentence = 0.0 # Thời gian giữa 2 câu
@@ -154,7 +154,13 @@ class ChapterGetAllApi(Resource):
                                 })
                             sentence_item['highlightAreas'] = bounding_box_list
                             sentence_list.append(sentence_item)
-                    return make_response(jsonify({'urls':chapter.get_public_urls(),'chapter': chapter, 'numChapter': num_chapter,'sentences': sentence_list}), 200)
+                    return make_response(jsonify({
+                        'urls':chapter.get_public_urls(),
+                        'chapter': chapter, 
+                        'numChapter': num_chapter,
+                        'sentences': sentence_list,
+                        'all_chapters': all_chapters,
+                    }), 200)
                 except (FieldDoesNotExist, ValidationError):
                     session.abort_transaction()
                     raise SchemaValidationError

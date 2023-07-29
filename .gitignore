@@ -11,3 +11,4 @@ Ebook/cache
 Tesseract/
 queue-data/
 mongo-data
+Ebook/credentials/*

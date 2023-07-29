@@ -1,4 +1,4 @@
-from cloud.minio_utils import *
+from cloud.minio_utils import generate_presigned_url
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource

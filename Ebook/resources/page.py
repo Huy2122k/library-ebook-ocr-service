@@ -3,23 +3,20 @@ import json
 import unidecode
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
-from cloud.minio_utils import *
+from cloud.minio_utils import generate_presigned_url
 from database.models import Chapter, Page, Sentence, Status
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
+from langdetect import detect
 from mongoengine.errors import (DoesNotExist, FieldDoesNotExist,
                                 InvalidQueryError, NotUniqueError,
                                 ValidationError)
-from pdf_task import *
 from resources.base_errors import InvalidIdReq
 from resources.page_errors import (DeletingPageError, InternalServerError,
                                    PageAlreadyExistsError, PageNotExistsError,
                                    SchemaValidationError, UpdatingPageError)
 
-
-def remove_accent(text):
-    return unidecode.unidecode(text)
 
 class PagesApi(Resource):
     def get(self):
@@ -69,11 +66,12 @@ class PageApi(Resource):
                 # replace all
                 Sentence.objects(page = page).delete()
                 #bulk create
-                new_sentences= [Sentence(**se, text_search=remove_accent(se["text"]), page = page) for se in body["sentences"]]
-                new_sentence_ids = Sentence.objects.insert(new_sentences, load_bulk=False)
-                page.update(
-                    sentences = new_sentence_ids
-                )
+                new_sentences = [Sentence(**se, text_search=self.remove_accent(se["text"]), language_detect=self.detect_sentence_language(se["text"]), page=page) for se in body["sentences"]]
+                if len(new_sentences) > 0:
+                    new_sentence_ids = Sentence.objects.insert(new_sentences, load_bulk=False)
+                    page.update(
+                        sentences = new_sentence_ids
+                    )
                 del body["sentences"]
                 page.update(
                     **body
@@ -118,3 +116,14 @@ class PageApi(Resource):
         page_dict["presigned_audio"] =  generate_presigned_url(page.get_audio_key(),"GET", "audio/mpeg")
         page_dict['sentences'] = json.loads(Sentence.objects.filter(page=page).to_json())
         return page_dict
+
+    def remove_accent(self, text):
+        return unidecode.unidecode(text)
+
+    def detect_sentence_language(self, text):
+        try:
+            language = str(detect(text))
+        except:
+            language = 'en'
+            pass
+        return language

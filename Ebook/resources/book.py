@@ -1,12 +1,13 @@
 import json
 
 from celery import chain
-from cloud.minio_utils import *
-from database.models import Book, Chapter, EbookType, Sentence
+# from cloud.minio_utils import *
+from database.models import Book, Chapter, EbookType, Sentence, Status
 from flask import Response, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from flask_restful import Resource
-from pdf_task import *
+from pdf_task import (bounding_box_preprocess, concat_audio, merge_chapter_pdf,
+                      split_page_pdf, text_to_speech)
 
 
 class BooksApi(Resource):

@@ -2,7 +2,7 @@ import json
 from enum import Enum
 
 from bson.objectid import ObjectId
-from cloud.minio_utils import *
+from cloud.minio_utils import generate_presigned_url
 from flask_bcrypt import check_password_hash, generate_password_hash
 from mongoengine.queryset import QuerySet
 
@@ -24,6 +24,7 @@ class Sentence(db.Document):
     page = db.ReferenceField('Page', required=True)
     index = db.IntField(required=True)
     text = db.StringField()
+    language_detect = db.StringField(required=False)
     ocr_texts = db.ListField(default=[])
     text_search = db.StringField()
     bounding_box = db.ListField(default=[])
